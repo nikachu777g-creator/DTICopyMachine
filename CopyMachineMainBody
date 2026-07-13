@@ -1,0 +1,701 @@
+local LocalPlayer = game.Players.LocalPlayer
+local GuiName = "SavedOutfitCopier"
+
+if LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild(GuiName) then
+	LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild(GuiName):Destroy()
+end
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = GuiName
+Gui.Parent = LocalPlayer:FindFirstChild("PlayerGui")
+
+function CreateAGuiPart(ClassName:string, Parent, Properties)
+	local GuiPart = Instance.new(ClassName)
+	if Properties then
+		for PropertyName, PropertyValue in Properties do
+			GuiPart[PropertyName] = PropertyValue
+		end
+	end
+	GuiPart.Parent = Parent
+
+	return GuiPart
+end
+
+--GuiCode
+local GuiBase = CreateAGuiPart("Frame", Gui, {Size = UDim2.new(0.253, 0, 0.863, 0), Position = UDim2.new(0.089, 0, 0.039, 0), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0})
+
+local PlayerList = CreateAGuiPart("ScrollingFrame", GuiBase, {Position = UDim2.new(0.043, 0, 0.011, 0), Size = UDim2.new(0.917, 0, 0.305, 0), BackgroundColor3 = Color3.new(0.796078, 1, 0.760784), AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(0,0,0,0), BorderSizePixel = 0})
+CreateAGuiPart("UIListLayout", PlayerList, {FillDirection = Enum.FillDirection.Vertical, Wraps = true, SortOrder = Enum.SortOrder.LayoutOrder})
+
+local OutfitList = CreateAGuiPart("ScrollingFrame", GuiBase, {Position = UDim2.new(0.043, 0, 0.338, 0), Size = UDim2.new(0.917, 0, 0.639, 0), BackgroundColor3 = Color3.new(0.796078, 1, 0.760784), AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(0,0,0,0), BorderSizePixel = 0})
+CreateAGuiPart("UIListLayout", OutfitList, {FillDirection = Enum.FillDirection.Horizontal, Wraps = true, SortOrder = Enum.SortOrder.LayoutOrder})
+
+local CloseMenuButton = CreateAGuiPart("TextButton", GuiBase, {Position = UDim2.new(-0.147,0,0,0), Size = UDim2.new(0.145,0,0.095,0), TextScaled = true, Text = "X", BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0})
+CreateAGuiPart("UIAspectRatioConstraint", CloseMenuButton)
+
+CloseMenuButton.MouseButton1Click:Connect(function()
+	if PlayerList.Visible == true then
+		GuiBase.BackgroundTransparency = 1
+		PlayerList.Visible = false
+		OutfitList.Visible = false
+		CloseMenuButton.Text = "O"
+	else
+		GuiBase.BackgroundTransparency = 0
+		PlayerList.Visible = true
+		OutfitList.Visible = true
+		CloseMenuButton.Text = "X"
+	end
+end)
+
+--PlayerNames
+function AddPlayerName(Player:Player)
+	local Character = Player.Character or Player.CharacterAdded:Wait()
+	local Attachment = Instance.new("Attachment")
+	Attachment.CFrame = CFrame.new(0, 2, 0)
+	Attachment.Parent = Character:FindFirstChild("Head")
+	
+	local NameGui = CreateAGuiPart("BillboardGui", Attachment, {Size = UDim2.new(7, 0, 1, 0)})
+	local NameLabel = CreateAGuiPart("TextLabel", NameGui, {BackgroundTransparency = 1, TextScaled = true, Text = Player.Name, Size = UDim2.new(1, 0, 1, 0)})
+	CreateAGuiPart("UIStroke", NameLabel, {Color = Color3.new(1, 1, 1), Thickness = 3})
+end
+
+for _, Player in game.Players:GetChildren() do
+	task.spawn(AddPlayerName, Player)
+end
+
+game.Players.PlayerAdded:Connect(function(Player)
+	task.spawn(AddPlayerName, Player)
+end)
+
+
+--MainCode
+local nailMeshes = {
+	Default = "rbxassetid://87314606407072",
+	Short = "rbxassetid://90163885387454",
+	["Box 1"] = "rbxassetid://83360311393035",
+	["Box 2"] = "rbxassetid://105623517017453",
+	Coffin = "rbxassetid://93358606851400",
+	Duck = "rbxassetid://76729928119808",
+	["Claws 1"] = "rbxassetid://132334350927763" ,
+	["Claws 2"] = "rbxassetid://114731927706987",
+	["Baddie 1"]  = "rbxassetid://78068931489653",
+	["Baddie 2"] = "rbxassetid://137541547279581",
+	["Curved Long"] = "rbxassetid://121415189879464",
+}
+local nailEvent = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ChangeNailStyle')
+
+local function getDecalIn(char, decalName)
+	local head = char:WaitForChild("Head")
+
+	local decal = head:FindFirstChild(decalName)
+	if not decal then
+		return nil
+	end
+
+	local index = decal:GetAttribute("Index") or nil
+	local color = decal.Color3 or Color3.fromRGB(255, 255, 255)
+
+	return index, color
+end
+
+local function getColorKey(char, decalName)
+	local head = char:WaitForChild("Head")
+
+	local decal = head:FindFirstChild(decalName)
+	if not decal then
+		return nil
+	end
+
+	local key = decal:GetAttribute("ColorKey") or nil
+
+	return key
+end
+
+local function getPieceIndexes(char)
+	local tbl = {}
+
+	for _, decal in pairs(char.Head:GetChildren()) do
+		if decal:IsA("Decal") then
+			local name = decal.Name
+			if name ~= "face" then
+				local index, color = getDecalIn(char, name)
+				if index then
+					tbl[name] = {Index = index, Color = color, Key = getColorKey(char, name), Feature = decal:GetAttribute("Feature")}
+				end
+			end
+		end
+	end
+
+	return tbl
+end
+
+local function getOpacities(char)
+	local function collect(name)
+		local t = {}
+		local _, color = getDecalIn(char, name)
+		if color then
+			local decal = char.Head:FindFirstChild(name)
+			if not decal or not decal:IsA("Decal") then return end
+			t[1] = decal.Transparency
+			if t[1] == 0 then return end
+			local key = getColorKey(char, name)
+			if not key then return end
+			t[2] = key
+		end
+		return t
+	end
+
+	local tbl = {}
+
+	for _, decal in pairs(char.Head:GetChildren()) do
+		if decal:IsA("Decal") then
+			local name = decal.Name
+			if name ~= "face" then
+				local data = collect(name)
+				if not data then continue end
+				if decal:GetAttribute("Feature") then
+					data[3] = decal:GetAttribute("Feature")
+				end
+				tbl[name] = data
+			end
+		end
+	end
+
+	return tbl
+end
+
+local function getPieceColors(char)
+	local function collect(name)
+		local t = {}
+		local _, color = getDecalIn(char, name)
+		local decal = char.Head:FindFirstChild(name)
+		if not decal:GetAttribute("Feature") then return end
+		if color then
+			local makeupIn, _ = getDecalIn(char, name)
+			local key = getColorKey(char, name)
+			if not key then return end
+			t = {color, makeupIn, key, decal:GetAttribute("Feature")}
+		end
+		return t
+	end
+
+	local tbl = {}
+
+	for _, decal in pairs(char.Head:GetChildren()) do
+		if decal:IsA("Decal") then
+			local name = decal.Name
+			if name ~= "face" then
+				local data = collect(name)
+				if not data then continue end
+				tbl[name] = data
+			end
+		end
+	end
+
+	return tbl
+end
+
+local CMWear = game.ReplicatedStorage:WaitForChild('RemoteEvents'):WaitForChild('CustomMakeup')
+local CMcolor = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ApplyMakeupColor')
+local CMopacity = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("MakeupOpacity")
+
+local function getCMPreset(char)
+	local lines = {}
+	local pieces = getPieceIndexes(char)
+	local pieceColors = getPieceColors(char)
+	local opacities = getOpacities(char)
+
+	for pieceName, data in pairs(pieces) do
+		if data and data.Index and data.Feature then
+			local cleanName = data["Feature"]:gsub("%d+", "")
+			local pieceIndex = tonumber(string.gsub(data["Feature"], "%D", ""))
+
+			if cleanName == "Touches" then
+				CMWear:FireServer(cleanName, data.Index, pieceIndex)
+			else
+				CMWear:FireServer(cleanName, data.Index, false)
+			end
+		end
+	end
+
+	for pieceName, colorData in pairs(pieceColors) do
+		local color = colorData[1]
+		local makeupIndex = colorData[2]
+		local pieceIndex = colorData[3]
+		local cleanName = colorData[4]:gsub("%d+", "")
+		local touchIndex = tonumber(string.gsub(colorData[4], "%D", ""))
+		if not pieceIndex then continue end
+
+		if cleanName == "Touches" then
+			CMcolor:FireServer( cleanName, makeupIndex, touchIndex, pieceIndex, color)
+		else
+			CMcolor:FireServer(cleanName, makeupIndex, false, pieceIndex, color)
+		end
+	end
+
+	for pieceName, opacity in pairs(opacities) do
+		local transparency = opacity[1]
+		local pieceIndex = opacity[2]
+		local feature = opacity[3]
+		local cleanName = feature:gsub("%d+", "")
+		local touchIndex = tonumber(string.gsub(feature, "%D", ""))
+		if cleanName == "Touches" then
+			CMopacity:FireServer(cleanName, pieceIndex, touchIndex, transparency)
+		else
+			CMopacity:FireServer(cleanName, pieceIndex, false, transparency)
+		end
+	end
+end
+
+local function getItemInfo(char, itemName)
+	local item = char:WaitForChild("EquippedAccessories"):FindFirstChild(itemName)
+	if item then
+		local customizationData = item:WaitForChild("CustomizationData")
+		if customizationData then
+			local itemInfo = {}
+			local colors = customizationData:WaitForChild("Colors")
+			for i, v in colors:GetChildren() do
+				if v:IsA("Configuration") then
+					local partIndex = v.Name
+					local partColor = v:GetAttribute("Color")
+					local partPattern = v:GetAttribute("Pattern")
+					local partMaterial = v:GetAttribute("Material")
+					if partPattern == "" then
+						partPattern = nil
+					end
+					if partMaterial == "" then
+						partMaterial = nil
+					end
+					local partData = {Index = partIndex, Color = partColor, Pattern = partPattern, Material = partMaterial}
+					table.insert(itemInfo, partData)
+				end
+			end
+
+			return itemInfo
+		end
+	end
+end
+
+local function getItemAdjustments(char, itemName)
+	local item = char:WaitForChild("EquippedAccessories"):FindFirstChild(itemName)
+	if item then
+		local customizationData = item:WaitForChild("CustomizationData")
+		if customizationData then
+			local position = customizationData:WaitForChild("Position")
+			local posX = position:WaitForChild("X").Value
+			local posY = position:WaitForChild("Y").Value
+			local posZ = position:WaitForChild("Z").Value
+			local rotation = customizationData:WaitForChild("Rotation")
+			local rotX = rotation:WaitForChild("X").Value
+			local rotY = rotation:WaitForChild("Y").Value
+			local rotZ = rotation:WaitForChild("Z").Value
+			local scale = customizationData:WaitForChild("Scale")
+			local scaleVal = scale:WaitForChild("Scale").Value
+
+			local adjustments = {Position = {X = posX, Y = posY, Z = posZ}, Rotation = {X = rotX, Y = rotY, Z = rotZ}, Scale = scaleVal}
+			return adjustments
+		end
+	end
+end
+
+local function getGender(char)
+	local gender = char:WaitForChild("Gender")
+end
+
+local function getItemToggles(char, itemName)
+	local item = char:WaitForChild("EquippedAccessories"):FindFirstChild(itemName)
+	if item then
+		local customizationData = item:WaitForChild("CustomizationData")
+		if customizationData then
+			local toggleInfo = {}
+			local mainToggle = customizationData:WaitForChild("Toggle")
+			toggleInfo["Main"] = mainToggle.Value
+			local subToggles = customizationData:WaitForChild("SubToggles")
+			local stInfo = {}
+			for i, stVal in subToggles:GetChildren() do
+				if stVal:IsA("StringValue") then
+					local stName = stVal.Name
+					local state = stVal.Value
+					stInfo[stName] = state
+				end
+			end
+			toggleInfo["Subs"] = stInfo
+			local switchToggles = customizationData:WaitForChild("SwitchToggles")
+			local swInfo = {}
+			if switchToggles then
+				local success, togglesModule = pcall(function()
+					return require(game.ReplicatedStorage.Content.Toggles)
+				end)
+				if success then
+					local itemToggles = togglesModule[itemName]
+					if itemToggles then
+						local swapsInfo = itemToggles.Toggles[tonumber(mainToggle.Value)].SwapToggles
+						if typeof(swapsInfo) == "table" then
+							for _, stVal in ipairs(switchToggles:GetChildren()) do
+								if stVal:IsA("StringValue") then
+									local stIndex = tonumber(stVal.Name)
+
+									if not stIndex then
+										continue
+									end
+
+									local data = swapsInfo[stIndex]
+									if not data then
+										continue
+									end
+
+									table.insert(swInfo, {
+										ofType = data.displayName,
+										index = tonumber(stVal.Value)
+									})
+								end
+							end
+						end
+					end
+				end
+			end
+			toggleInfo["Switch"] = swInfo
+			return toggleInfo
+		end
+	end
+end
+
+local function getNailsInfo(char)
+	local def = char:WaitForChild("DefaultAccessories")
+	local nailsFolder = def:WaitForChild("Nails")
+	local nailsPart = nailsFolder:FindFirstChildOfClass("MeshPart")
+
+	local nailShape
+
+	for shapeName, shapeMesh in pairs(nailMeshes) do
+		if shapeMesh == nailsPart.MeshId then
+			nailShape = shapeName
+		end
+	end
+
+	local nailColor = nailsPart.Color
+	local nailPattern = nailsPart.TextureID
+	local nailMaterial
+	local customizationData = nailsFolder:FindFirstChild("CustomizationData")
+	if customizationData then
+		local colors = customizationData:WaitForChild("Colors")
+		local colorOne = colors:WaitForChild("1")
+		if colorOne then
+			nailMaterial  = colorOne:GetAttribute("Material")
+		end
+	end
+	if nailPattern == "" then
+		nailPattern = nil
+	end
+	if not nailMaterial then
+		nailMaterial = ""
+	end
+
+	return {Shape = nailShape, Color = nailColor, Pattern = nailPattern, Material = nailMaterial}
+end
+
+local function getClearFace()
+	local classicM = require(game.ReplicatedStorage:WaitForChild("Content"):WaitForChild("ClassicMakeup"))
+
+	for i, faceInfo in ipairs(classicM) do
+		if i == #classicM then
+			return i
+		end
+	end
+end
+
+local function getClassicIn(char)
+	local head = char:WaitForChild("Head")
+	local face = head:WaitForChild("face")
+	local tex = face.Texture
+	local success, classicM = pcall(function()
+		return require(game.ReplicatedStorage:WaitForChild("Content"):WaitForChild("ClassicMakeup"))
+	end)
+
+	local found = false
+
+	if success then
+		for i, faceInfo in ipairs(classicM) do
+			local textures = faceInfo[1]
+			if typeof(textures) == "table" then
+				if textures[1] == tex then
+					found = true
+					return i, "Light"
+				elseif textures[2] == tex then
+					found = true
+					return i, "Dark"
+				end
+			else
+				if textures == tex then
+					found = true
+					return i, "Light"
+				end
+			end
+		end
+	end
+
+	if not found then
+		return getClearFace(), "Light"
+	end
+end
+
+local function getMakeup(char)
+	local head = char:WaitForChild("Head")
+	local custom = false
+
+	for i, dec in head:GetChildren() do
+		if dec:IsA("Decal") then
+			if dec.Name ~= "face" then
+				custom = true
+				break
+			end
+		end
+	end
+
+	if custom == true then
+		return getCMPreset(char)
+	else
+		local inx, tone = getClassicIn(char)
+		game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ClassicMakeup'):FireServer(inx, tone)
+	end
+end
+
+local equipRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('EquipItem')
+local unEquipRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('UnequipItem')
+local colorRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ColorAccessory')
+local toggleRemote = "game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('DressUpToggle')"
+local skinRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ChangeSkintone')
+local matRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('MaterialAccessory')
+local adjustRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('AdjustAccessory')
+local vitilgoRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('VitiligoSkin')
+
+local function getOutfit(char)
+	local gender = getGender(char)
+	game.ReplicatedStorage.RemoteEvents.ChangeGender:FireServer(gender)
+
+	local equipped = char:WaitForChild("EquippedAccessories")
+
+	for i, item in equipped:GetChildren() do
+		equipRemote:FireServer(item.Name)
+		local toggleInfo = getItemToggles(char, item.Name)
+		if toggleInfo then
+			local main = toggleInfo.Main
+			local subs = toggleInfo.Subs
+			local switch = toggleInfo.Switch
+
+			local parts = {}
+
+			for key, value in pairs(subs) do
+				table.insert(parts, string.format('[%q] = %q', key, value))
+			end
+
+			local subsString = '{' .. table.concat(parts, ', ') .. '}'
+
+			if typeof(switch) ~= "table" then
+				switch = {}
+			end
+
+			local swapParts = {}
+
+			for _, swapInfo in ipairs(switch) do
+				if swapInfo and swapInfo.ofType and swapInfo.index then
+					table.insert(
+						swapParts,
+						string.format(
+							'{ofType = [[%s]], index = %d}',
+							swapInfo.ofType or "",
+							tonumber(swapInfo.index) or 0
+						)
+					)
+				end
+			end
+
+			local swapsString = '{' .. table.concat(swapParts, ', ') .. '}'
+			
+			local toggleString = toggleRemote..":FireServer([["..item.Name.."]]"..", "..main..", "..subsString..", nil, nil"..", "..swapsString..")"
+			
+			loadstring(toggleString)()
+		end
+		
+		local adjustments = getItemAdjustments(char, item.Name)
+		if adjustments then
+			local positionInfo = adjustments.Position
+			local rotationInfo = adjustments.Rotation
+			local scale = adjustments.Scale
+
+			for axis, value in pairs(positionInfo) do
+				if value == 0 then continue end
+				adjustRemote:FireServer(item.Name, [[Position]], axis, value)
+			end
+
+			for axis, value in pairs(rotationInfo) do
+				if value == 0 then continue end
+				adjustRemote:FireServer(item.Name, [[Rotation]], axis, value)
+			end
+
+			if scale ~= 1 then
+				adjustRemote:FireServer(item.Name, [[Scale]], "_", scale)
+			end
+		end
+		local itemInfo = getItemInfo(char, item.Name)
+		if itemInfo then
+			for i, partData in pairs(itemInfo) do
+				colorRemote:FireServer(item.Name, partData.Index, partData.Color)
+				
+				if partData.Pattern then
+					colorRemote:FireServer(item.Name, partData.Index, partData.Pattern)
+				end
+				if partData.Material then
+					matRemote:FireServer(item.Name, partData.Index, partData.Material)
+				end
+			end
+		end
+	end
+
+	local nailsInfo = getNailsInfo(char)
+	if nailsInfo then
+		if nailsInfo.Shape then
+			nailEvent:FireServer(nailsInfo.Shape)
+		end
+		if nailsInfo.Color then
+			colorRemote:FireServer([[Nails]], [[1]], Color3.new(nailsInfo.Color.R, nailsInfo.Color.G, nailsInfo.Color.B))
+		end
+		if nailsInfo.Pattern then
+			colorRemote:FireServer([[Nails]], [[1]], nailsInfo.Pattern)
+		end
+		if nailsInfo.Material then
+			matRemote:FireServer('Nails', [[1]], nailsInfo.Material)
+		end
+	end
+
+	local skinColor = char:WaitForChild("Head").Color
+	skinRemote:FireServer(skinColor)
+	
+	local vitiligo = char:GetAttribute("Vitiligo") or "Off"
+	if vitiligo then
+		vitilgoRemote:FireServer(tostring(vitiligo))
+	end
+end
+
+local clearOutfit = function()
+	for i, v in game.Players.LocalPlayer.Character:WaitForChild('EquippedAccessories'):GetChildren() do
+		unEquipRemote:FireServer(v.Name)
+	end
+end
+
+local function WearOutfit(Outfit)
+	if not Outfit then return end
+	
+	clearOutfit()
+	getOutfit(Outfit)
+	
+	game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ClassicMakeup'):FireServer(301, 'Light')
+	
+	getMakeup(Outfit)
+end
+
+local EquipItem = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("EquipItem")
+local UnequipItem = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("UnequipItem")
+local ColorAccessory = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ColorAccessory")
+local MaterialAccessory = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("MaterialAccessory")
+local AdjustAccessory = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("AdjustAccessory")
+local DressUpToggle = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("DressUpToggle")
+
+local ChangeSkintone = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ChangeSkintone")
+
+local CustomMakeup = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("CustomMakeup")
+local ApplyMakeupColor = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ApplyMakeupColor")
+
+function WearOutfitLegacy(Outfit)
+	for _, Cloth in LocalPlayer.Character.EquippedAccessories:GetChildren() do
+		UnequipItem:FireServer(Cloth.Name)
+	end
+	
+	for _, Cloth in Outfit.EquippedAccessories:GetChildren() do
+		EquipItem:fireServer(Cloth.Name)
+		for _, Color in Cloth.CustomizationData.Colors:GetChildren() do
+			ColorAccessory:FireServer(Cloth.Name, Color.Name, Color:GetAttribute("Color"))
+			ColorAccessory:FireServer(Cloth.Name, Color.Name, Color:GetAttribute("Pattern"))
+		end
+		local SubToggles = {}
+		for _, SubToggle in Cloth.CustomizationData.SubToggles:GetChildren() do
+			SubToggles[SubToggle.Name] = SubToggle.Value
+		end
+		DressUpToggle:FireServer(Cloth.Name, Cloth.CustomizationData.Toggle.Value, SubToggles)
+	end
+
+	ChangeSkintone:FireServer(Outfit.Head.Color)
+end
+
+function LoadOutfits(Player)
+	for _, Outfit in game:GetService("ReplicatedStorage"):WaitForChild("OutfitReplicationFolder"):GetChildren() do
+		local IsContainsPlayerID = string.find(Outfit.Name, Player.UserId)
+		if IsContainsPlayerID ~= nil then
+			local OutfitModel = Outfit:Clone()
+			local OutfitButton = CreateAGuiPart("TextButton", OutfitList, {Size = UDim2.new(0.321,0,0.309,0), TextTransparency = 1, BackgroundColor3 = Color3.new(0.823529, 1, 0.592157), BorderSizePixel = 0})
+			CreateAGuiPart("UIAspectRatioConstraint", OutfitButton)
+			
+			local ViewportFrame = CreateAGuiPart("ViewportFrame", OutfitButton, {Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1})
+			local Camera = CreateAGuiPart("Camera", ViewportFrame, {CFrame = CFrame.new(0, 0.7, -3) * CFrame.Angles(0,math.rad(180),0)})
+			ViewportFrame.CurrentCamera = Camera
+			
+			local IDStart, IDEnd = string.find(Outfit.Name, Player.UserId)
+			local Name = string.sub(Outfit.Name, 1, IDStart-1)
+			
+			local OutfitName = CreateAGuiPart("TextLabel", OutfitButton, {Position = UDim2.new(0,0,0.793,0), Size = UDim2.new(0.996,0,0.202,0), BackgroundTransparency = 1, Text = Name, TextScaled = true, TextColor3 = Color3.new(1, 1, 1)})
+			CreateAGuiPart("UIStroke", OutfitName, {Color = Color3.new(0, 0, 0), Thickness = 1})
+			
+			local WorldModel = CreateAGuiPart("WorldModel", ViewportFrame)
+			
+			OutfitModel.Parent = WorldModel
+			Outfit:PivotTo(CFrame.new(0, 0, 0))
+			
+			OutfitButton.MouseButton1Click:Connect(function()
+				WearOutfit(Outfit)
+			end)
+		end
+	end
+end
+
+function UnloadOutfits()
+	for _, Outfit in OutfitList:GetChildren() do
+		if Outfit:IsA("TextButton") then
+			Outfit:Destroy()
+		end
+	end
+end
+
+
+--PlayerList
+function AddPlayerButton(Player)
+	local PlayerButton = CreateAGuiPart("TextButton", PlayerList, {Size = UDim2.new(0.333,0,0.223,0), Text = Player.Name, TextScaled = true, BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0})
+	PlayerButton.Name = Player.Name
+
+	PlayerButton.MouseButton1Click:Connect(function()
+		for _, PlayerButton in PlayerList:GetChildren() do
+			if PlayerButton:IsA("TextButton") then
+				PlayerButton.BackgroundColor3 = Color3.new(1, 1, 1)
+			end
+		end
+
+		PlayerButton.BackgroundColor3 = Color3.new(0.823529, 1, 0.592157)
+		
+		UnloadOutfits()
+		LoadOutfits(Player)
+	end)
+end
+for _, Player in game.Players:GetChildren() do
+	AddPlayerButton(Player)
+end
+
+game.Players.PlayerAdded:Connect(function(Player)
+	AddPlayerButton(Player)
+end)
+
+game.Players.PlayerRemoving:Connect(function(Player)
+	for _, PlayerButton in PlayerList:GetChildren() do
+		if PlayerButton.Name == Player.Name then
+			PlayerButton:Destroy()
+		end
+	end
+end)
