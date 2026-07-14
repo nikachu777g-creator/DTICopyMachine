@@ -1,62 +1,162 @@
 local LocalPlayer = game.Players.LocalPlayer
 local GuiName = "SavedOutfitCopier"
 
-if LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild(GuiName) then
-	LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild(GuiName):Destroy()
+-- Безопасное ожидание дочернего объекта с таймаутом
+local function WaitForChildSafe(parent, childName, timeout)
+	timeout = timeout or 5
+	local start = tick()
+	while tick() - start < timeout do
+		local child = parent:FindFirstChild(childName)
+		if child then
+			return child
+		end
+		task.wait(0.1)
+	end
+	warn("WaitForChildSafe: timeout waiting for " .. childName .. " in " .. parent.Name)
+	return nil
+end
+
+-- Безопасное удаление GUI
+local playerGui = WaitForChildSafe(LocalPlayer, "PlayerGui", 3)
+if playerGui then
+	local existingGui = playerGui:FindFirstChild(GuiName)
+	if existingGui then
+		existingGui:Destroy()
+	end
+else
+	warn("PlayerGui not found, cannot create GUI")
+	return
 end
 
 local Gui = Instance.new("ScreenGui")
 Gui.Name = GuiName
-Gui.Parent = LocalPlayer:FindFirstChild("PlayerGui")
+Gui.Parent = playerGui
 
-function CreateAGuiPart(ClassName:string, Parent, Properties)
+-- Создание элемента GUI с проверками
+function CreateAGuiPart(ClassName, Parent, Properties)
+	if not Parent then
+		warn("CreateAGuiPart: Parent is nil, cannot create " .. ClassName)
+		return nil
+	end
 	local GuiPart = Instance.new(ClassName)
 	if Properties then
-		for PropertyName, PropertyValue in Properties do
-			GuiPart[PropertyName] = PropertyValue
+		for PropertyName, PropertyValue in pairs(Properties) do
+			pcall(function()
+				GuiPart[PropertyName] = PropertyValue
+			end)
 		end
 	end
 	GuiPart.Parent = Parent
-
 	return GuiPart
 end
 
---GuiCode
-local GuiBase = CreateAGuiPart("Frame", Gui, {Size = UDim2.new(0.253, 0, 0.863, 0), Position = UDim2.new(0.089, 0, 0.039, 0), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0})
+-- Основной GUI
+local GuiBase = CreateAGuiPart("Frame", Gui, {
+	Size = UDim2.new(0.253, 0, 0.863, 0),
+	Position = UDim2.new(0.089, 0, 0.039, 0),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0
+})
+if not GuiBase then return end
 
-local PlayerList = CreateAGuiPart("ScrollingFrame", GuiBase, {Position = UDim2.new(0.043, 0, 0.011, 0), Size = UDim2.new(0.917, 0, 0.305, 0), BackgroundColor3 = Color3.new(0.796078, 1, 0.760784), AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(0,0,0,0), BorderSizePixel = 0})
-CreateAGuiPart("UIListLayout", PlayerList, {FillDirection = Enum.FillDirection.Vertical, Wraps = true, SortOrder = Enum.SortOrder.LayoutOrder})
+local PlayerList = CreateAGuiPart("ScrollingFrame", GuiBase, {
+	Position = UDim2.new(0.043, 0, 0.011, 0),
+	Size = UDim2.new(0.917, 0, 0.305, 0),
+	BackgroundColor3 = Color3.new(0.796078, 1, 0.760784),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	CanvasSize = UDim2.new(0,0,2,0),
+	BorderSizePixel = 0
+})
+if PlayerList then
+	CreateAGuiPart("UIListLayout", PlayerList, {
+		FillDirection = Enum.FillDirection.Vertical,
+		Wraps = true,
+		SortOrder = Enum.SortOrder.LayoutOrder
+	})
+end
 
-local OutfitList = CreateAGuiPart("ScrollingFrame", GuiBase, {Position = UDim2.new(0.043, 0, 0.338, 0), Size = UDim2.new(0.917, 0, 0.639, 0), BackgroundColor3 = Color3.new(0.796078, 1, 0.760784), AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(0,0,0,0), BorderSizePixel = 0})
-CreateAGuiPart("UIListLayout", OutfitList, {FillDirection = Enum.FillDirection.Horizontal, Wraps = true, SortOrder = Enum.SortOrder.LayoutOrder})
+local OutfitList = CreateAGuiPart("ScrollingFrame", GuiBase, {
+	Position = UDim2.new(0.043, 0, 0.338, 0),
+	Size = UDim2.new(0.917, 0, 0.639, 0),
+	BackgroundColor3 = Color3.new(0.796078, 1, 0.760784),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	CanvasSize = UDim2.new(0,0,0,0),
+	BorderSizePixel = 0
+})
+if OutfitList then
+	CreateAGuiPart("UIListLayout", OutfitList, {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Wraps = true,
+		SortOrder = Enum.SortOrder.LayoutOrder
+	})
+end
 
-local CloseMenuButton = CreateAGuiPart("TextButton", GuiBase, {Position = UDim2.new(-0.147,0,0,0), Size = UDim2.new(0.145,0,0.095,0), TextScaled = true, Text = "X", BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0})
-CreateAGuiPart("UIAspectRatioConstraint", CloseMenuButton)
+local CloseMenuButton = CreateAGuiPart("TextButton", GuiBase, {
+	Position = UDim2.new(-0.147,0,0,0),
+	Size = UDim2.new(0.145,0,0.095,0),
+	TextScaled = true,
+	Text = "X",
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0
+})
+if CloseMenuButton then
+	CreateAGuiPart("UIAspectRatioConstraint", CloseMenuButton)
+	CloseMenuButton.MouseButton1Click:Connect(function()
+		if PlayerList and OutfitList then
+			if PlayerList.Visible == true then
+				GuiBase.BackgroundTransparency = 1
+				PlayerList.Visible = false
+				OutfitList.Visible = false
+				CloseMenuButton.Text = "O"
+			else
+				GuiBase.BackgroundTransparency = 0
+				PlayerList.Visible = true
+				OutfitList.Visible = true
+				CloseMenuButton.Text = "X"
+			end
+		end
+	end)
+end
 
-CloseMenuButton.MouseButton1Click:Connect(function()
-	if PlayerList.Visible == true then
-		GuiBase.BackgroundTransparency = 1
-		PlayerList.Visible = false
-		OutfitList.Visible = false
-		CloseMenuButton.Text = "O"
-	else
-		GuiBase.BackgroundTransparency = 0
-		PlayerList.Visible = true
-		OutfitList.Visible = true
-		CloseMenuButton.Text = "X"
+-- Имена игроков над головами (безопасно)
+function AddPlayerName(Player)
+	if not Player then return end
+	local success, err = pcall(function()
+		local Character = Player.Character or Player.CharacterAdded:Wait()
+		if not Character then
+			warn("Character not found for player " .. Player.Name)
+			return
+		end
+		local Head = WaitForChildSafe(Character, "Head", 3)
+		if not Head then
+			warn("Head not found for " .. Player.Name)
+			return
+		end
+		local Attachment = Instance.new("Attachment")
+		Attachment.CFrame = CFrame.new(0, 2, 0)
+		Attachment.Parent = Head
+
+		local NameGui = CreateAGuiPart("BillboardGui", Attachment, {
+			Size = UDim2.new(7, 0, 1, 0)
+		})
+		if NameGui then
+			local NameLabel = CreateAGuiPart("TextLabel", NameGui, {
+				BackgroundTransparency = 1,
+				TextScaled = true,
+				Text = Player.Name,
+				Size = UDim2.new(1, 0, 1, 0)
+			})
+			if NameLabel then
+				CreateAGuiPart("UIStroke", NameLabel, {
+					Color = Color3.new(1, 1, 1),
+					Thickness = 3
+				})
+			end
+		end
+	end)
+	if not success then
+		warn("AddPlayerName error for " .. Player.Name .. ": " .. tostring(err))
 	end
-end)
-
---PlayerNames
-function AddPlayerName(Player:Player)
-	local Character = Player.Character or Player.CharacterAdded:Wait()
-	local Attachment = Instance.new("Attachment")
-	Attachment.CFrame = CFrame.new(0, 2, 0)
-	Attachment.Parent = Character:FindFirstChild("Head")
-	
-	local NameGui = CreateAGuiPart("BillboardGui", Attachment, {Size = UDim2.new(7, 0, 1, 0)})
-	local NameLabel = CreateAGuiPart("TextLabel", NameGui, {BackgroundTransparency = 1, TextScaled = true, Text = Player.Name, Size = UDim2.new(1, 0, 1, 0)})
-	CreateAGuiPart("UIStroke", NameLabel, {Color = Color3.new(1, 1, 1), Thickness = 3})
 end
 
 for _, Player in game.Players:GetChildren() do
@@ -67,8 +167,14 @@ game.Players.PlayerAdded:Connect(function(Player)
 	task.spawn(AddPlayerName, Player)
 end)
 
+-- Константы и удалённые события (с таймаутами)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RemoteEvents = WaitForChildSafe(ReplicatedStorage, "RemoteEvents", 10)
+if not RemoteEvents then
+	warn("RemoteEvents not found, script cannot continue")
+	return
+end
 
---MainCode
 local nailMeshes = {
 	Default = "rbxassetid://87314606407072",
 	Short = "rbxassetid://90163885387454",
@@ -76,131 +182,118 @@ local nailMeshes = {
 	["Box 2"] = "rbxassetid://105623517017453",
 	Coffin = "rbxassetid://93358606851400",
 	Duck = "rbxassetid://76729928119808",
-	["Claws 1"] = "rbxassetid://132334350927763" ,
+	["Claws 1"] = "rbxassetid://132334350927763",
 	["Claws 2"] = "rbxassetid://114731927706987",
 	["Baddie 1"]  = "rbxassetid://78068931489653",
 	["Baddie 2"] = "rbxassetid://137541547279581",
 	["Curved Long"] = "rbxassetid://121415189879464",
 }
-local nailEvent = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ChangeNailStyle')
 
+local nailEvent = WaitForChildSafe(RemoteEvents, "ChangeNailStyle", 5)
+if not nailEvent then warn("ChangeNailStyle not found") end
+
+-- Вспомогательные функции с проверками
 local function getDecalIn(char, decalName)
-	local head = char:WaitForChild("Head")
-
+	if not char then return nil end
+	local head = WaitForChildSafe(char, "Head", 2)
+	if not head then return nil end
 	local decal = head:FindFirstChild(decalName)
-	if not decal then
-		return nil
-	end
-
+	if not decal or not decal:IsA("Decal") then return nil end
 	local index = decal:GetAttribute("Index") or nil
 	local color = decal.Color3 or Color3.fromRGB(255, 255, 255)
-
 	return index, color
 end
 
 local function getColorKey(char, decalName)
-	local head = char:WaitForChild("Head")
-
+	if not char then return nil end
+	local head = WaitForChildSafe(char, "Head", 2)
+	if not head then return nil end
 	local decal = head:FindFirstChild(decalName)
-	if not decal then
-		return nil
-	end
-
-	local key = decal:GetAttribute("ColorKey") or nil
-
-	return key
+	if not decal or not decal:IsA("Decal") then return nil end
+	return decal:GetAttribute("ColorKey") or nil
 end
 
 local function getPieceIndexes(char)
 	local tbl = {}
-
-	for _, decal in pairs(char.Head:GetChildren()) do
+	local head = WaitForChildSafe(char, "Head", 2)
+	if not head then return tbl end
+	for _, decal in pairs(head:GetChildren()) do
 		if decal:IsA("Decal") then
 			local name = decal.Name
 			if name ~= "face" then
 				local index, color = getDecalIn(char, name)
 				if index then
-					tbl[name] = {Index = index, Color = color, Key = getColorKey(char, name), Feature = decal:GetAttribute("Feature")}
+					tbl[name] = {
+						Index = index,
+						Color = color,
+						Key = getColorKey(char, name),
+						Feature = decal:GetAttribute("Feature")
+					}
 				end
 			end
 		end
 	end
-
 	return tbl
 end
 
 local function getOpacities(char)
-	local function collect(name)
-		local t = {}
-		local _, color = getDecalIn(char, name)
-		if color then
-			local decal = char.Head:FindFirstChild(name)
-			if not decal or not decal:IsA("Decal") then return end
-			t[1] = decal.Transparency
-			if t[1] == 0 then return end
-			local key = getColorKey(char, name)
-			if not key then return end
-			t[2] = key
-		end
-		return t
-	end
-
 	local tbl = {}
-
-	for _, decal in pairs(char.Head:GetChildren()) do
+	local head = WaitForChildSafe(char, "Head", 2)
+	if not head then return tbl end
+	for _, decal in pairs(head:GetChildren()) do
 		if decal:IsA("Decal") then
 			local name = decal.Name
 			if name ~= "face" then
-				local data = collect(name)
-				if not data then continue end
-				if decal:GetAttribute("Feature") then
-					data[3] = decal:GetAttribute("Feature")
+				local _, color = getDecalIn(char, name)
+				if color then
+					local decalObj = head:FindFirstChild(name)
+					if not decalObj or not decalObj:IsA("Decal") then continue end
+					local transparency = decalObj.Transparency
+					if transparency == 0 then continue end
+					local key = getColorKey(char, name)
+					if not key then continue end
+					local data = {transparency, key}
+					if decalObj:GetAttribute("Feature") then
+						data[3] = decalObj:GetAttribute("Feature")
+					end
+					tbl[name] = data
 				end
-				tbl[name] = data
 			end
 		end
 	end
-
 	return tbl
 end
 
 local function getPieceColors(char)
-	local function collect(name)
-		local t = {}
-		local _, color = getDecalIn(char, name)
-		local decal = char.Head:FindFirstChild(name)
-		if not decal:GetAttribute("Feature") then return end
-		if color then
-			local makeupIn, _ = getDecalIn(char, name)
-			local key = getColorKey(char, name)
-			if not key then return end
-			t = {color, makeupIn, key, decal:GetAttribute("Feature")}
-		end
-		return t
-	end
-
 	local tbl = {}
-
-	for _, decal in pairs(char.Head:GetChildren()) do
+	local head = WaitForChildSafe(char, "Head", 2)
+	if not head then return tbl end
+	for _, decal in pairs(head:GetChildren()) do
 		if decal:IsA("Decal") then
 			local name = decal.Name
 			if name ~= "face" then
-				local data = collect(name)
-				if not data then continue end
-				tbl[name] = data
+				local feature = decal:GetAttribute("Feature")
+				if not feature then continue end
+				local _, color = getDecalIn(char, name)
+				if color then
+					local makeupIn, _ = getDecalIn(char, name)
+					local key = getColorKey(char, name)
+					if not key then continue end
+					tbl[name] = {color, makeupIn, key, feature}
+				end
 			end
 		end
 	end
-
 	return tbl
 end
 
-local CMWear = game.ReplicatedStorage:WaitForChild('RemoteEvents'):WaitForChild('CustomMakeup')
-local CMcolor = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ApplyMakeupColor')
-local CMopacity = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("MakeupOpacity")
+-- Remote события для макияжа
+local CMWear = WaitForChildSafe(RemoteEvents, "CustomMakeup", 5)
+local CMcolor = WaitForChildSafe(RemoteEvents, "ApplyMakeupColor", 5)
+local CMopacity = WaitForChildSafe(RemoteEvents, "MakeupOpacity", 5)
 
 local function getCMPreset(char)
-	local lines = {}
+	if not char then return end
 	local pieces = getPieceIndexes(char)
 	local pieceColors = getPieceColors(char)
 	local opacities = getOpacities(char)
@@ -209,11 +302,10 @@ local function getCMPreset(char)
 		if data and data.Index and data.Feature then
 			local cleanName = data["Feature"]:gsub("%d+", "")
 			local pieceIndex = tonumber(string.gsub(data["Feature"], "%D", ""))
-
 			if cleanName == "Touches" then
-				CMWear:FireServer(cleanName, data.Index, pieceIndex)
+				if CMWear then CMWear:FireServer(cleanName, data.Index, pieceIndex) end
 			else
-				CMWear:FireServer(cleanName, data.Index, false)
+				if CMWear then CMWear:FireServer(cleanName, data.Index, false) end
 			end
 		end
 	end
@@ -224,12 +316,12 @@ local function getCMPreset(char)
 		local pieceIndex = colorData[3]
 		local cleanName = colorData[4]:gsub("%d+", "")
 		local touchIndex = tonumber(string.gsub(colorData[4], "%D", ""))
-		if not pieceIndex then continue end
-
-		if cleanName == "Touches" then
-			CMcolor:FireServer( cleanName, makeupIndex, touchIndex, pieceIndex, color)
-		else
-			CMcolor:FireServer(cleanName, makeupIndex, false, pieceIndex, color)
+		if pieceIndex then
+			if cleanName == "Touches" then
+				if CMcolor then CMcolor:FireServer(cleanName, makeupIndex, touchIndex, pieceIndex, color) end
+			else
+				if CMcolor then CMcolor:FireServer(cleanName, makeupIndex, false, pieceIndex, color) end
+			end
 		end
 	end
 
@@ -237,315 +329,283 @@ local function getCMPreset(char)
 		local transparency = opacity[1]
 		local pieceIndex = opacity[2]
 		local feature = opacity[3]
-		local cleanName = feature:gsub("%d+", "")
-		local touchIndex = tonumber(string.gsub(feature, "%D", ""))
-		if cleanName == "Touches" then
-			CMopacity:FireServer(cleanName, pieceIndex, touchIndex, transparency)
-		else
-			CMopacity:FireServer(cleanName, pieceIndex, false, transparency)
+		if feature then
+			local cleanName = feature:gsub("%d+", "")
+			local touchIndex = tonumber(string.gsub(feature, "%D", ""))
+			if cleanName == "Touches" then
+				if CMopacity then CMopacity:FireServer(cleanName, pieceIndex, touchIndex, transparency) end
+			else
+				if CMopacity then CMopacity:FireServer(cleanName, pieceIndex, false, transparency) end
+			end
 		end
 	end
 end
 
+-- Функции для работы с аксессуарами
 local function getItemInfo(char, itemName)
-	local item = char:WaitForChild("EquippedAccessories"):FindFirstChild(itemName)
-	if item then
-		local customizationData = item:WaitForChild("CustomizationData")
-		if customizationData then
-			local itemInfo = {}
-			local colors = customizationData:WaitForChild("Colors")
-			for i, v in colors:GetChildren() do
-				if v:IsA("Configuration") then
-					local partIndex = v.Name
-					local partColor = v:GetAttribute("Color")
-					local partPattern = v:GetAttribute("Pattern")
-					local partMaterial = v:GetAttribute("Material")
-					if partPattern == "" then
-						partPattern = nil
-					end
-					if partMaterial == "" then
-						partMaterial = nil
-					end
-					local partData = {Index = partIndex, Color = partColor, Pattern = partPattern, Material = partMaterial}
-					table.insert(itemInfo, partData)
-				end
-			end
-
-			return itemInfo
+	if not char then return nil end
+	local equipped = WaitForChildSafe(char, "EquippedAccessories", 2)
+	if not equipped then return nil end
+	local item = equipped:FindFirstChild(itemName)
+	if not item then return nil end
+	local customizationData = WaitForChildSafe(item, "CustomizationData", 2)
+	if not customizationData then return nil end
+	local colors = WaitForChildSafe(customizationData, "Colors", 2)
+	if not colors then return nil end
+	local itemInfo = {}
+	for _, v in colors:GetChildren() do
+		if v:IsA("Configuration") then
+			local partIndex = v.Name
+			local partColor = v:GetAttribute("Color")
+			local partPattern = v:GetAttribute("Pattern") or nil
+			local partMaterial = v:GetAttribute("Material") or nil
+			if partPattern == "" then partPattern = nil end
+			if partMaterial == "" then partMaterial = nil end
+			table.insert(itemInfo, {Index = partIndex, Color = partColor, Pattern = partPattern, Material = partMaterial})
 		end
 	end
+	return itemInfo
 end
 
 local function getItemAdjustments(char, itemName)
-	local item = char:WaitForChild("EquippedAccessories"):FindFirstChild(itemName)
-	if item then
-		local customizationData = item:WaitForChild("CustomizationData")
-		if customizationData then
-			local position = customizationData:WaitForChild("Position")
-			local posX = position:WaitForChild("X").Value
-			local posY = position:WaitForChild("Y").Value
-			local posZ = position:WaitForChild("Z").Value
-			local rotation = customizationData:WaitForChild("Rotation")
-			local rotX = rotation:WaitForChild("X").Value
-			local rotY = rotation:WaitForChild("Y").Value
-			local rotZ = rotation:WaitForChild("Z").Value
-			local scale = customizationData:WaitForChild("Scale")
-			local scaleVal = scale:WaitForChild("Scale").Value
-
-			local adjustments = {Position = {X = posX, Y = posY, Z = posZ}, Rotation = {X = rotX, Y = rotY, Z = rotZ}, Scale = scaleVal}
-			return adjustments
-		end
-	end
+	if not char then return nil end
+	local equipped = WaitForChildSafe(char, "EquippedAccessories", 2)
+	if not equipped then return nil end
+	local item = equipped:FindFirstChild(itemName)
+	if not item then return nil end
+	local customizationData = WaitForChildSafe(item, "CustomizationData", 2)
+	if not customizationData then return nil end
+	local position = WaitForChildSafe(customizationData, "Position", 2)
+	local rotation = WaitForChildSafe(customizationData, "Rotation", 2)
+	local scale = WaitForChildSafe(customizationData, "Scale", 2)
+	if not (position and rotation and scale) then return nil end
+	local posX = WaitForChildSafe(position, "X", 1)
+	local posY = WaitForChildSafe(position, "Y", 1)
+	local posZ = WaitForChildSafe(position, "Z", 1)
+	local rotX = WaitForChildSafe(rotation, "X", 1)
+	local rotY = WaitForChildSafe(rotation, "Y", 1)
+	local rotZ = WaitForChildSafe(rotation, "Z", 1)
+	local scaleVal = WaitForChildSafe(scale, "Scale", 1)
+	if not (posX and posY and posZ and rotX and rotY and rotZ and scaleVal) then return nil end
+	return {
+		Position = {X = posX.Value, Y = posY.Value, Z = posZ.Value},
+		Rotation = {X = rotX.Value, Y = rotY.Value, Z = rotZ.Value},
+		Scale = scaleVal.Value
+	}
 end
 
 local function getGender(char)
-	local gender = char:WaitForChild("Gender")
+	if not char then return nil end
+	return WaitForChildSafe(char, "Gender", 2)
 end
 
 local function getItemToggles(char, itemName)
-	local item = char:WaitForChild("EquippedAccessories"):FindFirstChild(itemName)
-	if item then
-		local customizationData = item:WaitForChild("CustomizationData")
-		if customizationData then
-			local toggleInfo = {}
-			local mainToggle = customizationData:WaitForChild("Toggle")
-			toggleInfo["Main"] = mainToggle.Value
-			local subToggles = customizationData:WaitForChild("SubToggles")
-			local stInfo = {}
-			for i, stVal in subToggles:GetChildren() do
-				if stVal:IsA("StringValue") then
-					local stName = stVal.Name
-					local state = stVal.Value
-					stInfo[stName] = state
-				end
+	if not char then return nil end
+	local equipped = WaitForChildSafe(char, "EquippedAccessories", 2)
+	if not equipped then return nil end
+	local item = equipped:FindFirstChild(itemName)
+	if not item then return nil end
+	local customizationData = WaitForChildSafe(item, "CustomizationData", 2)
+	if not customizationData then return nil end
+	local mainToggle = WaitForChildSafe(customizationData, "Toggle", 2)
+	if not mainToggle then return nil end
+	local subToggles = WaitForChildSafe(customizationData, "SubToggles", 2)
+	local switchToggles = WaitForChildSafe(customizationData, "SwitchToggles", 2)
+
+	local toggleInfo = {}
+	toggleInfo["Main"] = mainToggle.Value
+	local stInfo = {}
+	if subToggles then
+		for _, stVal in subToggles:GetChildren() do
+			if stVal:IsA("StringValue") then
+				stInfo[stVal.Name] = stVal.Value
 			end
-			toggleInfo["Subs"] = stInfo
-			local switchToggles = customizationData:WaitForChild("SwitchToggles")
-			local swInfo = {}
-			if switchToggles then
-				local success, togglesModule = pcall(function()
-					return require(game.ReplicatedStorage.Content.Toggles)
-				end)
-				if success then
-					local itemToggles = togglesModule[itemName]
-					if itemToggles then
-						local swapsInfo = itemToggles.Toggles[tonumber(mainToggle.Value)].SwapToggles
-						if typeof(swapsInfo) == "table" then
-							for _, stVal in ipairs(switchToggles:GetChildren()) do
-								if stVal:IsA("StringValue") then
-									local stIndex = tonumber(stVal.Name)
+		end
+	end
+	toggleInfo["Subs"] = stInfo
 
-									if not stIndex then
-										continue
-									end
-
-									local data = swapsInfo[stIndex]
-									if not data then
-										continue
-									end
-
-									table.insert(swInfo, {
-										ofType = data.displayName,
-										index = tonumber(stVal.Value)
-									})
-								end
+	local swInfo = {}
+	if switchToggles then
+		local success, togglesModule = pcall(function()
+			return require(game.ReplicatedStorage.Content.Toggles)
+		end)
+		if success and togglesModule then
+			local itemToggles = togglesModule[itemName]
+			if itemToggles and itemToggles.Toggles ~= nil then
+				local swapsInfo = itemToggles.Toggles[tonumber(mainToggle.Value)] and itemToggles.Toggles[tonumber(mainToggle.Value)].SwapToggles
+				if type(swapsInfo) == "table" then
+					for _, stVal in ipairs(switchToggles:GetChildren()) do
+						if stVal:IsA("StringValue") then
+							local stIndex = tonumber(stVal.Name)
+							if stIndex and swapsInfo[stIndex] then
+								table.insert(swInfo, {
+									ofType = swapsInfo[stIndex].displayName,
+									index = tonumber(stVal.Value)
+								})
 							end
 						end
 					end
 				end
 			end
-			toggleInfo["Switch"] = swInfo
-			return toggleInfo
 		end
 	end
+	toggleInfo["Switch"] = swInfo
+	return toggleInfo
 end
 
 local function getNailsInfo(char)
-	local def = char:WaitForChild("DefaultAccessories")
-	local nailsFolder = def:WaitForChild("Nails")
+	if not char then return nil end
+	local def = WaitForChildSafe(char, "DefaultAccessories", 2)
+	if not def then return nil end
+	local nailsFolder = WaitForChildSafe(def, "Nails", 2)
+	if not nailsFolder then return nil end
 	local nailsPart = nailsFolder:FindFirstChildOfClass("MeshPart")
+	if not nailsPart then return nil end
 
 	local nailShape
-
 	for shapeName, shapeMesh in pairs(nailMeshes) do
 		if shapeMesh == nailsPart.MeshId then
 			nailShape = shapeName
+			break
 		end
 	end
-
 	local nailColor = nailsPart.Color
 	local nailPattern = nailsPart.TextureID
-	local nailMaterial
+	if nailPattern == "" then nailPattern = nil end
+
+	local nailMaterial = ""
 	local customizationData = nailsFolder:FindFirstChild("CustomizationData")
 	if customizationData then
-		local colors = customizationData:WaitForChild("Colors")
-		local colorOne = colors:WaitForChild("1")
-		if colorOne then
-			nailMaterial  = colorOne:GetAttribute("Material")
+		local colors = customizationData:FindFirstChild("Colors")
+		if colors then
+			local colorOne = colors:FindFirstChild("1")
+			if colorOne then
+				nailMaterial = colorOne:GetAttribute("Material") or ""
+			end
 		end
 	end
-	if nailPattern == "" then
-		nailPattern = nil
-	end
-	if not nailMaterial then
-		nailMaterial = ""
-	end
-
 	return {Shape = nailShape, Color = nailColor, Pattern = nailPattern, Material = nailMaterial}
 end
 
 local function getClearFace()
-	local classicM = require(game.ReplicatedStorage:WaitForChild("Content"):WaitForChild("ClassicMakeup"))
-
-	for i, faceInfo in ipairs(classicM) do
-		if i == #classicM then
-			return i
-		end
-	end
-end
-
-local function getClassicIn(char)
-	local head = char:WaitForChild("Head")
-	local face = head:WaitForChild("face")
-	local tex = face.Texture
 	local success, classicM = pcall(function()
 		return require(game.ReplicatedStorage:WaitForChild("Content"):WaitForChild("ClassicMakeup"))
 	end)
+	if success and classicM then
+		return #classicM
+	end
+	return 301 -- запасное значение
+end
 
-	local found = false
+local function getClassicIn(char)
+	if not char then return getClearFace(), "Light" end
+	local head = WaitForChildSafe(char, "Head", 2)
+	if not head then return getClearFace(), "Light" end
+	local face = head:FindFirstChild("face")
+	if not face or not face:IsA("Decal") then return getClearFace(), "Light" end
+	local tex = face.Texture
 
-	if success then
+	local success, classicM = pcall(function()
+		return require(game.ReplicatedStorage:WaitForChild("Content"):WaitForChild("ClassicMakeup"))
+	end)
+	if success and classicM then
 		for i, faceInfo in ipairs(classicM) do
 			local textures = faceInfo[1]
-			if typeof(textures) == "table" then
-				if textures[1] == tex then
-					found = true
-					return i, "Light"
-				elseif textures[2] == tex then
-					found = true
-					return i, "Dark"
-				end
+			if type(textures) == "table" then
+				if textures[1] == tex then return i, "Light"
+				elseif textures[2] == tex then return i, "Dark" end
 			else
-				if textures == tex then
-					found = true
-					return i, "Light"
-				end
+				if textures == tex then return i, "Light" end
 			end
 		end
 	end
-
-	if not found then
-		return getClearFace(), "Light"
-	end
+	return getClearFace(), "Light"
 end
 
 local function getMakeup(char)
-	local head = char:WaitForChild("Head")
+	if not char then return end
+	local head = WaitForChildSafe(char, "Head", 2)
+	if not head then return end
 	local custom = false
-
-	for i, dec in head:GetChildren() do
-		if dec:IsA("Decal") then
-			if dec.Name ~= "face" then
-				custom = true
-				break
-			end
+	for _, dec in head:GetChildren() do
+		if dec:IsA("Decal") and dec.Name ~= "face" then
+			custom = true
+			break
 		end
 	end
-
-	if custom == true then
-		return getCMPreset(char)
+	if custom then
+		getCMPreset(char)
 	else
 		local inx, tone = getClassicIn(char)
-		game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ClassicMakeup'):FireServer(inx, tone)
+		local classicRemote = WaitForChildSafe(RemoteEvents, "ClassicMakeup", 5)
+		if classicRemote then
+			classicRemote:FireServer(inx, tone)
+		end
 	end
 end
 
-local equipRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('EquipItem')
-local unEquipRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('UnequipItem')
-local colorRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ColorAccessory')
-local toggleRemote = "game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('DressUpToggle')"
-local skinRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ChangeSkintone')
-local matRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('MaterialAccessory')
-local adjustRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('AdjustAccessory')
-local vitilgoRemote = game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('VitiligoSkin')
+-- Основные remote события
+local equipRemote = WaitForChildSafe(RemoteEvents, "EquipItem", 5)
+local unEquipRemote = WaitForChildSafe(RemoteEvents, "UnequipItem", 5)
+local colorRemote = WaitForChildSafe(RemoteEvents, "ColorAccessory", 5)
+local skinRemote = WaitForChildSafe(RemoteEvents, "ChangeSkintone", 5)
+local matRemote = WaitForChildSafe(RemoteEvents, "MaterialAccessory", 5)
+local adjustRemote = WaitForChildSafe(RemoteEvents, "AdjustAccessory", 5)
+local vitilgoRemote = WaitForChildSafe(RemoteEvents, "VitiligoSkin", 5)
+local dressUpToggle = WaitForChildSafe(RemoteEvents, "DressUpToggle", 5)
+local changeGenderRemote = WaitForChildSafe(RemoteEvents, "ChangeGender", 5)
 
 local function getOutfit(char)
+	if not char then return end
 	local gender = getGender(char)
-	game.ReplicatedStorage.RemoteEvents.ChangeGender:FireServer(gender)
+	if gender and changeGenderRemote then
+		changeGenderRemote:FireServer(gender)
+	end
 
-	local equipped = char:WaitForChild("EquippedAccessories")
+	local equipped = WaitForChildSafe(char, "EquippedAccessories", 2)
+	if not equipped then return end
 
-	for i, item in equipped:GetChildren() do
-		equipRemote:FireServer(item.Name)
+	for _, item in equipped:GetChildren() do
+		if equipRemote then equipRemote:FireServer(item.Name) end
+		
 		local toggleInfo = getItemToggles(char, item.Name)
-		if toggleInfo then
+		if toggleInfo and dressUpToggle then
 			local main = toggleInfo.Main
 			local subs = toggleInfo.Subs
-			local switch = toggleInfo.Switch
-
-			local parts = {}
-
-			for key, value in pairs(subs) do
-				table.insert(parts, string.format('[%q] = %q', key, value))
-			end
-
-			local subsString = '{' .. table.concat(parts, ', ') .. '}'
-
-			if typeof(switch) ~= "table" then
-				switch = {}
-			end
-
-			local swapParts = {}
-
-			for _, swapInfo in ipairs(switch) do
-				if swapInfo and swapInfo.ofType and swapInfo.index then
-					table.insert(
-						swapParts,
-						string.format(
-							'{ofType = [[%s]], index = %d}',
-							swapInfo.ofType or "",
-							tonumber(swapInfo.index) or 0
-						)
-					)
-				end
-			end
-
-			local swapsString = '{' .. table.concat(swapParts, ', ') .. '}'
-			
-			local toggleString = toggleRemote..":FireServer([["..item.Name.."]]"..", "..main..", "..subsString..", nil, nil"..", "..swapsString..")"
-			
-			loadstring(toggleString)()
+			local switch = toggleInfo.Switch or {}
+			dressUpToggle:FireServer(item.Name, main, subs, nil, nil, switch)
 		end
-		
+
 		local adjustments = getItemAdjustments(char, item.Name)
-		if adjustments then
+		if adjustments and adjustRemote then
 			local positionInfo = adjustments.Position
 			local rotationInfo = adjustments.Rotation
 			local scale = adjustments.Scale
-
 			for axis, value in pairs(positionInfo) do
-				if value == 0 then continue end
-				adjustRemote:FireServer(item.Name, [[Position]], axis, value)
+				if value ~= 0 then
+					adjustRemote:FireServer(item.Name, "Position", axis, value)
+				end
 			end
-
 			for axis, value in pairs(rotationInfo) do
-				if value == 0 then continue end
-				adjustRemote:FireServer(item.Name, [[Rotation]], axis, value)
+				if value ~= 0 then
+					adjustRemote:FireServer(item.Name, "Rotation", axis, value)
+				end
 			end
-
 			if scale ~= 1 then
-				adjustRemote:FireServer(item.Name, [[Scale]], "_", scale)
+				adjustRemote:FireServer(item.Name, "Scale", "_", scale)
 			end
 		end
+
 		local itemInfo = getItemInfo(char, item.Name)
 		if itemInfo then
-			for i, partData in pairs(itemInfo) do
-				colorRemote:FireServer(item.Name, partData.Index, partData.Color)
-				
-				if partData.Pattern then
-					colorRemote:FireServer(item.Name, partData.Index, partData.Pattern)
+			for _, partData in ipairs(itemInfo) do
+				if colorRemote then
+					colorRemote:FireServer(item.Name, partData.Index, partData.Color)
+					if partData.Pattern then
+						colorRemote:FireServer(item.Name, partData.Index, partData.Pattern)
+					end
 				end
-				if partData.Material then
+				if partData.Material and matRemote then
 					matRemote:FireServer(item.Name, partData.Index, partData.Material)
 				end
 			end
@@ -554,136 +614,211 @@ local function getOutfit(char)
 
 	local nailsInfo = getNailsInfo(char)
 	if nailsInfo then
-		if nailsInfo.Shape then
+		if nailsInfo.Shape and nailEvent then
 			nailEvent:FireServer(nailsInfo.Shape)
 		end
-		if nailsInfo.Color then
-			colorRemote:FireServer([[Nails]], [[1]], Color3.new(nailsInfo.Color.R, nailsInfo.Color.G, nailsInfo.Color.B))
+		if nailsInfo.Color and colorRemote then
+			colorRemote:FireServer("Nails", "1", nailsInfo.Color)
 		end
-		if nailsInfo.Pattern then
-			colorRemote:FireServer([[Nails]], [[1]], nailsInfo.Pattern)
+		if nailsInfo.Pattern and colorRemote then
+			colorRemote:FireServer("Nails", "1", nailsInfo.Pattern)
 		end
-		if nailsInfo.Material then
-			matRemote:FireServer('Nails', [[1]], nailsInfo.Material)
+		if nailsInfo.Material and matRemote then
+			matRemote:FireServer("Nails", "1", nailsInfo.Material)
 		end
 	end
 
-	local skinColor = char:WaitForChild("Head").Color
-	skinRemote:FireServer(skinColor)
-	
+	local head = WaitForChildSafe(char, "Head", 2)
+	if head and skinRemote then
+		skinRemote:FireServer(head.Color)
+	end
+
 	local vitiligo = char:GetAttribute("Vitiligo") or "Off"
-	if vitiligo then
+	if vitiligo and vitilgoRemote then
 		vitilgoRemote:FireServer(tostring(vitiligo))
 	end
 end
 
-local clearOutfit = function()
-	for i, v in game.Players.LocalPlayer.Character:WaitForChild('EquippedAccessories'):GetChildren() do
-		unEquipRemote:FireServer(v.Name)
+local function clearOutfit()
+	local char = LocalPlayer.Character
+	if not char then return end
+	local equipped = WaitForChildSafe(char, "EquippedAccessories", 2)
+	if not equipped then return end
+	for _, v in equipped:GetChildren() do
+		if unEquipRemote then
+			unEquipRemote:FireServer(v.Name)
+		end
 	end
 end
 
 local function WearOutfit(Outfit)
 	if not Outfit then return end
-	
-	clearOutfit()
-	getOutfit(Outfit)
-	
-	game:GetService('ReplicatedStorage'):WaitForChild('RemoteEvents'):WaitForChild('ClassicMakeup'):FireServer(301, 'Light')
-	
-	getMakeup(Outfit)
+	local success, err = pcall(function()
+		clearOutfit()
+		getOutfit(Outfit)
+
+		local classicRemote = WaitForChildSafe(RemoteEvents, "ClassicMakeup", 5)
+		if classicRemote then
+			classicRemote:FireServer(301, "Light")
+		end
+		getMakeup(Outfit)
+	end)
+	if not success then
+		warn("WearOutfit error: " .. tostring(err))
+	end
 end
 
-local EquipItem = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("EquipItem")
-local UnequipItem = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("UnequipItem")
-local ColorAccessory = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ColorAccessory")
-local MaterialAccessory = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("MaterialAccessory")
-local AdjustAccessory = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("AdjustAccessory")
-local DressUpToggle = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("DressUpToggle")
-
-local ChangeSkintone = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ChangeSkintone")
-
-local CustomMakeup = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("CustomMakeup")
-local ApplyMakeupColor = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("ApplyMakeupColor")
-
+-- Legacy функция (используется?)
 function WearOutfitLegacy(Outfit)
-	for _, Cloth in LocalPlayer.Character.EquippedAccessories:GetChildren() do
-		UnequipItem:FireServer(Cloth.Name)
-	end
-	
-	for _, Cloth in Outfit.EquippedAccessories:GetChildren() do
-		EquipItem:fireServer(Cloth.Name)
-		for _, Color in Cloth.CustomizationData.Colors:GetChildren() do
-			ColorAccessory:FireServer(Cloth.Name, Color.Name, Color:GetAttribute("Color"))
-			ColorAccessory:FireServer(Cloth.Name, Color.Name, Color:GetAttribute("Pattern"))
-		end
-		local SubToggles = {}
-		for _, SubToggle in Cloth.CustomizationData.SubToggles:GetChildren() do
-			SubToggles[SubToggle.Name] = SubToggle.Value
-		end
-		DressUpToggle:FireServer(Cloth.Name, Cloth.CustomizationData.Toggle.Value, SubToggles)
+	if not Outfit then return end
+	local char = LocalPlayer.Character
+	if not char then return end
+	local equipped = WaitForChildSafe(char, "EquippedAccessories", 2)
+	if not equipped then return end
+
+	for _, Cloth in equipped:GetChildren() do
+		if unEquipRemote then unEquipRemote:FireServer(Cloth.Name) end
 	end
 
-	ChangeSkintone:FireServer(Outfit.Head.Color)
+	local outfitEquipped = WaitForChildSafe(Outfit, "EquippedAccessories", 2)
+	if not outfitEquipped then return end
+	for _, Cloth in outfitEquipped:GetChildren() do
+		if equipRemote then equipRemote:FireServer(Cloth.Name) end
+		local customizationData = WaitForChildSafe(Cloth, "CustomizationData", 2)
+		if customizationData then
+			local colors = WaitForChildSafe(customizationData, "Colors", 2)
+			if colors then
+				for _, Color in colors:GetChildren() do
+					if colorRemote then
+						colorRemote:FireServer(Cloth.Name, Color.Name, Color:GetAttribute("Color"))
+						colorRemote:FireServer(Cloth.Name, Color.Name, Color:GetAttribute("Pattern"))
+					end
+				end
+			end
+			local subToggles = WaitForChildSafe(customizationData, "SubToggles", 2)
+			local mainToggle = WaitForChildSafe(customizationData, "Toggle", 2)
+			if subToggles and mainToggle and dressUpToggle then
+				local SubToggles = {}
+				for _, SubToggle in subToggles:GetChildren() do
+					SubToggles[SubToggle.Name] = SubToggle.Value
+				end
+				dressUpToggle:FireServer(Cloth.Name, mainToggle.Value, SubToggles)
+			end
+		end
+	end
+
+	local head = WaitForChildSafe(Outfit, "Head", 2)
+	if head and skinRemote then
+		skinRemote:FireServer(head.Color)
+	end
 end
 
-function LoadOutfits(Player)
-	for _, Outfit in game:GetService("ReplicatedStorage"):WaitForChild("OutfitReplicationFolder"):GetChildren() do
-		local IsContainsPlayerID = string.find(Outfit.Name, Player.UserId)
-		if IsContainsPlayerID ~= nil then
+-- Загрузка и выгрузка аутфитов
+local function LoadOutfits(Player)
+	if not Player then return end
+	local outfitFolder = WaitForChildSafe(ReplicatedStorage, "OutfitReplicationFolder", 5)
+	if not outfitFolder then return end
+
+	for _, Outfit in outfitFolder:GetChildren() do
+		if Outfit:IsA("Model") and string.find(Outfit.Name, tostring(Player.UserId)) then
 			local OutfitModel = Outfit:Clone()
-			local OutfitButton = CreateAGuiPart("TextButton", OutfitList, {Size = UDim2.new(0.321,0,0.309,0), TextTransparency = 1, BackgroundColor3 = Color3.new(0.823529, 1, 0.592157), BorderSizePixel = 0})
+			local OutfitButton = CreateAGuiPart("TextButton", OutfitList, {
+				Size = UDim2.new(0.321,0,0.309,0),
+				TextTransparency = 1,
+				BackgroundColor3 = Color3.new(0.823529, 1, 0.592157),
+				BorderSizePixel = 0
+			})
+			if not OutfitButton then continue end
 			CreateAGuiPart("UIAspectRatioConstraint", OutfitButton)
-			
-			local ViewportFrame = CreateAGuiPart("ViewportFrame", OutfitButton, {Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1})
-			local Camera = CreateAGuiPart("Camera", ViewportFrame, {CFrame = CFrame.new(0, 0.7, -3) * CFrame.Angles(0,math.rad(180),0)})
-			ViewportFrame.CurrentCamera = Camera
-			
-			local IDStart, IDEnd = string.find(Outfit.Name, Player.UserId)
+
+			local ViewportFrame = CreateAGuiPart("ViewportFrame", OutfitButton, {
+				Size = UDim2.new(1,0,1,0),
+				BackgroundTransparency = 1
+			})
+			if ViewportFrame then
+				local Camera = CreateAGuiPart("Camera", ViewportFrame, {
+					CFrame = CFrame.new(0, 0.7, -3) * CFrame.Angles(0, math.rad(180), 0)
+				})
+				if Camera then
+					ViewportFrame.CurrentCamera = Camera
+				end
+			end
+
+			local IDStart, IDEnd = string.find(Outfit.Name, tostring(Player.UserId))
 			local Name = string.sub(Outfit.Name, 1, IDStart-1)
-			
-			local OutfitName = CreateAGuiPart("TextLabel", OutfitButton, {Position = UDim2.new(0,0,0.793,0), Size = UDim2.new(0.996,0,0.202,0), BackgroundTransparency = 1, Text = Name, TextScaled = true, TextColor3 = Color3.new(1, 1, 1)})
-			CreateAGuiPart("UIStroke", OutfitName, {Color = Color3.new(0, 0, 0), Thickness = 1})
-			
+
+			local OutfitName = CreateAGuiPart("TextLabel", OutfitButton, {
+				Position = UDim2.new(0,0,0.793,0),
+				Size = UDim2.new(0.996,0,0.202,0),
+				BackgroundTransparency = 1,
+				Text = Name,
+				TextScaled = true,
+				TextColor3 = Color3.new(1, 1, 1)
+			})
+			if OutfitName then
+				CreateAGuiPart("UIStroke", OutfitName, {
+					Color = Color3.new(0, 0, 0),
+					Thickness = 1
+				})
+			end
+
 			local WorldModel = CreateAGuiPart("WorldModel", ViewportFrame)
-			
-			OutfitModel.Parent = WorldModel
-			Outfit:PivotTo(CFrame.new(0, 0, 0))
-			
+			if WorldModel then
+				OutfitModel.Parent = WorldModel
+				OutfitModel:PivotTo(CFrame.new(0, 0, 0))
+			end
+
+			-- Debounce для кнопки
+			local debounce = false
 			OutfitButton.MouseButton1Click:Connect(function()
+				if debounce then return end
+				debounce = true
+				task.delay(1, function() debounce = false end)
 				WearOutfit(Outfit)
 			end)
 		end
+		task.wait() -- небольшая задержка, чтобы не нагружать поток при большом количестве аутфитов
 	end
 end
 
 function UnloadOutfits()
-	for _, Outfit in OutfitList:GetChildren() do
-		if Outfit:IsA("TextButton") then
-			Outfit:Destroy()
+	if not OutfitList then return end
+	for _, child in OutfitList:GetChildren() do
+		if child:IsA("TextButton") then
+			child:Destroy()
 		end
 	end
 end
 
-
---PlayerList
+-- Кнопки игроков
 function AddPlayerButton(Player)
-	local PlayerButton = CreateAGuiPart("TextButton", PlayerList, {Size = UDim2.new(0.333,0,0.223,0), Text = Player.Name, TextScaled = true, BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0})
+	if not Player then return end
+	local PlayerButton = CreateAGuiPart("TextButton", PlayerList, {
+		Size = UDim2.new(0.333,0,0.223,0),
+		Text = Player.Name,
+		TextScaled = true,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0
+	})
+	if not PlayerButton then return end
 	PlayerButton.Name = Player.Name
 
+	local debounce = false
 	PlayerButton.MouseButton1Click:Connect(function()
-		for _, PlayerButton in PlayerList:GetChildren() do
-			if PlayerButton:IsA("TextButton") then
-				PlayerButton.BackgroundColor3 = Color3.new(1, 1, 1)
+		if debounce then return end
+		debounce = true
+		task.delay(0.5, function() debounce = false end)
+		for _, btn in PlayerList:GetChildren() do
+			if btn:IsA("TextButton") then
+				btn.BackgroundColor3 = Color3.new(1, 1, 1)
 			end
 		end
-
 		PlayerButton.BackgroundColor3 = Color3.new(0.823529, 1, 0.592157)
-		
 		UnloadOutfits()
 		LoadOutfits(Player)
 	end)
 end
+
 for _, Player in game.Players:GetChildren() do
 	AddPlayerButton(Player)
 end
@@ -693,9 +828,10 @@ game.Players.PlayerAdded:Connect(function(Player)
 end)
 
 game.Players.PlayerRemoving:Connect(function(Player)
-	for _, PlayerButton in PlayerList:GetChildren() do
-		if PlayerButton.Name == Player.Name then
-			PlayerButton:Destroy()
+	if not PlayerList then return end
+	for _, btn in PlayerList:GetChildren() do
+		if btn.Name == Player.Name then
+			btn:Destroy()
 		end
 	end
 end)
